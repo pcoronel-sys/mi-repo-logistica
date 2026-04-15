@@ -2,38 +2,49 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="Repo Logística", layout="wide")
+# 1. Configuración inmediata
+st.set_page_config(page_title="Carga Logística", layout="wide")
 
 st.title("📂 Repositorio Logística")
 
-# Intentar la conexión
+# 2. Conexión protegida
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    st.success("Conexión con Google establecida")
 except Exception as e:
-    st.error(f"Error de conexión: {e}")
+    st.error(f"Error al conectar con Google: {e}")
+    st.stop() # Detiene la ejecución si no hay conexión
 
+# 3. Interfaz de pestañas
 tab1, tab2, tab3 = st.tabs(["EXTRACICLOS", "REPROGRAMACIONES", "BULTOS"])
 
-def cargar(titulo, sheet_name):
-    with st.container():
-        st.subheader(titulo)
-        archivo = st.file_uploader(f"Subir {titulo}", type=['xlsx'], key=sheet_name)
-        
-        if archivo:
-            df = pd.read_excel(archivo)
-            if st.button(f"Guardar {titulo}"):
-                conn.update(worksheet=sheet_name, data=df)
-                st.success("Guardado en Google Sheets")
-        
-        st.divider()
-        # Mostrar lo que hay
+def procesar(nombre, hoja):
+    st.subheader(f"Gestión de {nombre}")
+    
+    # Subida de archivo
+    archivo = st.file_uploader(f"Excel para {nombre}", type=["xlsx"], key=f"key_{hoja}")
+    
+    if archivo:
         try:
-            df_actual = conn.read(worksheet=sheet_name, ttl=0)
-            st.dataframe(df_actual)
-        except:
-            st.info("Sin datos previos.")
+            df = pd.read_excel(archivo)
+            st.write("Vista previa:")
+            st.dataframe(df.head(3))
+            
+            if st.button(f"Guardar en {nombre}", key=f"btn_{hoja}"):
+                conn.update(worksheet=hoja, data=df)
+                st.success("¡Datos guardados!")
+                st.cache_data.clear()
+        except Exception as e:
+            st.error(f"Error procesando archivo: {e}")
 
-with tab1: cargar("Extraciclos", "Extraciclos")
-with tab2: cargar("Reprogramaciones", "Reprogramaciones")
-with tab3: cargar("Bultos", "Bultos")
+    st.divider()
+    
+    # Mostrar datos
+    try:
+        data = conn.read(worksheet=hoja, ttl=0)
+        st.dataframe(data, use_container_width=True)
+    except:
+        st.info(f"Sin datos en la pestaña {hoja}")
+
+with tab1: procesar("Extraciclos", "Extraciclos")
+with tab2: procesar("Reprogramaciones", "Reprogramaciones")
+with tab3: procesar("Bultos", "Bultos")
