@@ -2,42 +2,51 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="App Logística Cloud", layout="wide")
+st.set_page_config(page_title="Repositorio Logística", layout="wide")
 
-# Conectar con Google Sheets
-# Nota: La URL se configura en la siguiente sección
+# Conexión con Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("📂 Repositorio en la Nube (Google Sheets)")
+st.title("📂 Sistema de Carga de Información Logística")
+st.markdown("Carga tus archivos mensuales aquí. Los datos se guardarán automáticamente en Google Sheets.")
 
+# Definir las pestañas
 tab1, tab2, tab3 = st.tabs(["🔄 EXTRACICLOS", "📅 REPROGRAMACIONES", "📦 BULTOS"])
 
-def gestionar_seccion(nombre_pestaña, worksheet_name):
-    st.header(f"Sección {nombre_pestaña}")
+def procesar_carga(nombre_seccion, worksheet_name):
+    st.header(f"Sección de {nombre_seccion}")
     
-    # 1. Subir archivo
-    archivo = st.file_uploader(f"Actualizar {nombre_pestaña}", type=["xlsx"], key=nombre_pestaña)
+    # Subir el archivo Excel
+    archivo = st.file_uploader(f"Subir Excel para {nombre_seccion}", type=["xlsx"], key=f"up_{worksheet_name}")
     
     if archivo:
         df_nuevo = pd.read_excel(archivo)
-        if st.button(f"Subir a Google Sheets - {nombre_pestaña}"):
-            # Esto escribe los datos en la pestaña correspondiente de Google
-            conn.update(worksheet=worksheet_name, data=df_nuevo)
-            st.success("¡Datos guardados en la nube!")
+        st.write("🔍 Vista previa de los nuevos datos:")
+        st.dataframe(df_nuevo.head(10))
+        
+        if st.button(f"Confirmar y Actualizar {nombre_seccion}", key=f"btn_{worksheet_name}"):
+            with st.spinner('Actualizando Google Sheets...'):
+                # Actualiza la pestaña específica en Google Sheets
+                conn.update(worksheet=worksheet_name, data=df_nuevo)
+                st.success(f"✅ ¡Datos de {nombre_seccion} actualizados correctamente!")
+                st.balloons()
 
     st.divider()
-
-    # 2. Leer datos actuales
+    
+    # Mostrar datos actuales
     try:
+        st.subheader(f"📊 Datos actuales en {nombre_seccion}")
         df_actual = conn.read(worksheet=worksheet_name)
-        st.subheader("Datos actuales en Google Sheets:")
-        st.dataframe(df_actual)
-    except:
-        st.warning("Aún no hay datos en esta pestaña.")
+        st.dataframe(df_actual, use_container_width=True)
+    except Exception:
+        st.info(f"La pestaña '{worksheet_name}' está vacía o no existe aún en el Excel.")
 
+# Ejecutar la lógica en cada pestaña
 with tab1:
-    gestionar_seccion("Extraciclos", "Extraciclos")
+    procesar_carga("Extraciclos", "Extraciclos")
+
 with tab2:
-    gestionar_seccion("Reprogramaciones", "Reprogramaciones")
+    procesar_carga("Reprogramaciones", "Reprogramaciones")
+
 with tab3:
-    gestionar_seccion("Bultos", "Bultos")
+    procesar_carga("Bultos", "Bultos")
