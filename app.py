@@ -2,51 +2,32 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="Repositorio Logística", layout="wide")
+st.set_page_config(page_title="App Logística", layout="wide")
 
-# Conexión con Google Sheets
+# Conexión mejorada
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("📂 Sistema de Carga de Información Logística")
-st.markdown("Carga tus archivos mensuales aquí. Los datos se guardarán automáticamente en Google Sheets.")
-
-# Definir las pestañas
-tab1, tab2, tab3 = st.tabs(["🔄 EXTRACICLOS", "📅 REPROGRAMACIONES", "📦 BULTOS"])
+# ... (resto de tu código de títulos y pestañas igual) ...
 
 def procesar_carga(nombre_seccion, worksheet_name):
     st.header(f"Sección de {nombre_seccion}")
-    
-    # Subir el archivo Excel
     archivo = st.file_uploader(f"Subir Excel para {nombre_seccion}", type=["xlsx"], key=f"up_{worksheet_name}")
     
     if archivo:
         df_nuevo = pd.read_excel(archivo)
-        st.write("🔍 Vista previa de los nuevos datos:")
-        st.dataframe(df_nuevo.head(10))
-        
         if st.button(f"Confirmar y Actualizar {nombre_seccion}", key=f"btn_{worksheet_name}"):
-            with st.spinner('Actualizando Google Sheets...'):
-                # Actualiza la pestaña específica en Google Sheets
+            try:
+                # Intentamos la actualización
                 conn.update(worksheet=worksheet_name, data=df_nuevo)
-                st.success(f"✅ ¡Datos de {nombre_seccion} actualizados correctamente!")
-                st.balloons()
+                st.success("¡Datos actualizados!")
+                st.cache_data.clear() # Limpia la memoria para ver los cambios
+            except Exception as e:
+                st.error("Error de permisos: Google no permite escribir con un link público. Necesitas configurar los 'Secrets' con el formato completo.")
+                st.info("Mira el Paso 2 que te envié en el chat.")
 
-    st.divider()
-    
-    # Mostrar datos actuales
+    # Al leer, usamos ttl=0 para que siempre traiga lo más nuevo de Google
     try:
-        st.subheader(f"📊 Datos actuales en {nombre_seccion}")
-        df_actual = conn.read(worksheet=worksheet_name)
-        st.dataframe(df_actual, use_container_width=True)
-    except Exception:
-        st.info(f"La pestaña '{worksheet_name}' está vacía o no existe aún en el Excel.")
-
-# Ejecutar la lógica en cada pestaña
-with tab1:
-    procesar_carga("Extraciclos", "Extraciclos")
-
-with tab2:
-    procesar_carga("Reprogramaciones", "Reprogramaciones")
-
-with tab3:
-    procesar_carga("Bultos", "Bultos")
+        df_actual = conn.read(worksheet=worksheet_name, ttl=0)
+        st.dataframe(df_actual)
+    except:
+        st.info("Pestaña vacía.")
